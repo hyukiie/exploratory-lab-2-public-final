@@ -14,10 +14,6 @@
       "type": "vector",
       "url": "https://tiles.openfreemap.org/planet"
     },
-    "Airbnb-PPA": {
-      "type": "geojson",
-      "data": "https://hyukiie.github.io/exploratory-lab-1-public/Airbnb-PPA.geojson"
-    },
     "Van_polygon": {
       "type": "geojson",
       "data": "https://hyukiie.github.io/exploratory-lab-2-public/Van_Census_Tree_Polygons.geojson"
