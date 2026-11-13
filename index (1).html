@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Vancouver Heat Vulnerability Map</title>
+  <link href="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@turf/turf@7.4.0/turf.min.js"></script> <!-- load turfjs -->
+  <style> body { margin: 0; } #map { position: absolute; inset: 0; } 
+
+    /* Dropdown Menus - Variable choice + Point Filter */
+    /* https://www.w3schools.com/css/tryit.asp?filename=trycss_dropdown_button */
+    .interactables {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: rgba(255, 255, 255, 0.95);
+      padding: 12px;
+      border-radius: 6px; /* https://www.w3schools.com/cssref/tryit.php?filename=trycss3_border-radius4 */
+    }
+
+    /* Declutter to sections */
+    .point-section {
+      margin-top: 10px; /* https://www.w3schools.com/css/css_margin.asp */
+      border-top: 1px solid #eee; /* https://www.w3schools.com/howto/howto_css_dividers.asp*/
+      padding-top: 8px; /* https://www.w3schools.com/cssref/pr_padding-top.php */
+    }
+
+    .slider-section {
+      margin-top: 10px; /* https://www.w3schools.com/cssref/pr_margin-top.php */
+      border-top: 1px solid #eee; /* https://www.w3schools.com/howto/howto_css_dividers.asp*/
+      padding-top: 8px; /* https://www.w3schools.com/cssref/pr_padding-top.php */
+    }
+
+    .slider-instruction {
+      font-size: 10px;
+    }
+    .Legend {
+      position: absolute;
+      bottom: 30px;
+      right: 20px;
+      background: rgba(255, 255, 255, 0.95);
+      padding: 12px;
+      border-radius: 6px;
+    }
+    .Legend h4{
+      font-size: 20px;
+      margin-top: 0px;
+      margin-bottom: 3px;
+      font-weight: bold;
+    }
+
+    .Legend-section{
+      margin-bottom: 8px;
+      font-weight: bold;
+    }
+
+    .Legend-row{
+      display: flex; /* https://www.w3schools.com/css/css3_flexbox.asp */
+      align-items: center; /* https://www.w3schools.com/cssref/css3_pr_align-items.php*/
+      margin-bottom: 5px;
+    }
+
+    .Legend-color-box{
+      width: 15px;
+      height: 15px;
+      margin-right: 5px;
+      border: 1.5px solid #000;
+    }
+
+    .Legend-pool-circle{ /* https://www.w3schools.com/howto/tryit.asp?filename=tryhow_css_circles */
+      width: 15px;
+      height: 15px;
+      margin-right: 5px;
+      border: 1.5px solid #000;
+      border-radius: 50%;
+      background: rgba(32, 237, 247, 1);
+    }
+
+    .Legend-facility-circle{ /* https://www.w3schools.com/howto/tryit.asp?filename=tryhow_css_circles */
+      width: 15px;
+      height: 15px;
+      margin-right: 5px;
+      border: 1px solid #000;
+      border-radius: 50%;
+      background: rgba(0, 39, 255, 1);
+    }
+
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+    <div class="interactables">
+  
+    <div class="point-section">
+      <label for="Point-filter">Filter Points:</label>
+      <select id="Point-filter">
+        <option value="All">Show All Points</option>
+        <option value="Swimming Pools">Swimming Pools</option>
+        <option value="Community Centre Cooling Centres">Community Centre Cooling Centres</option>
+        <option value="Library Cooling Centre">Library Cooling Centre</option>
+        <option value="Community Partner Cooling Centre">Community Partner Cooling Centre</option>
+        <option value="Misting Station">Misting Station</option>
+        <option value="Spray Park">Spray Park</option>
+        <option value="Wading Pool">Wading Pool</option>
+    </select>
+
+      <!-- Referenced sliders from Tissot Matrix 472 slides 
+      and https://www.w3schools.com/howto/tryit.asp?filename=tryhow_css_js_rangeslider_round -->
+      <div class="slider-section">
+        <label> Set a Buffer:</label>
+        <p>Buffer size: <span id="radius">1000</span> m</p>
+        <input id="buffer-radius" type="range" min="0" max="3000" value="1000" data-type="pool">
+        <p class="slider-help">Drag slider to adjust buffer distance (0 to 3000m).</p>
+        <p id="cooling-count" style="margin-top: 5px;">Cooling Facilities in buffer: 0</p>
+        <p id="pool-count" style="margin-top: 5px;">Swimming Pools in buffer: 0</p>
+      </div> 
+    </div>
+  </div>
+
+       <div class="Legend">
+        <h4>Tree Canopy Cover (%)</h4>
+        <div class="Legend-row"> <span class="Legend-color-box" style="background: #ffffff;"></span> 0% - 14%</div>
+        <div class="Legend-row"> <span class="Legend-color-box" style="background: #c8e6c8;"></span> 15% - 29%</div>
+        <div class="Legend-row"> <span class="Legend-color-box" style="background: #8cc88c;"></span> 30% - 44%</div>
+        <div class="Legend-row"> <span class="Legend-color-box" style="background: #50a050;"></span> 45% - 59%</div>
+        <div class="Legend-row"> <span class="Legend-color-box" style="background: #297717;"></span> 60%+ </div> 
+        <div class="Legend-row"> <span class="Legend-color-box" style="background: #d3d3d3;"></span> No Data/Null</div>
+
+        <div class="Legend-section" style="margin-top: 12px;">Cooling Facilities</div>
+        <div class="Legend-row"> <span class="Legend-pool-circle" style=""></span> Facilities</div>
+        <div class="Legend-row"> <span class="Legend-facility-circle" style=""></span> Swimming Pools</div>
+      </div>
+      
+  <script>
+    const map = new maplibregl.Map({
+      container: 'map',
+      style: 'Lab2-test4.json',        // the file you downloaded from Maputnik
+      center: [-123.25, 49.26],    // longitude, latitude
+      zoom: 11,
+      minZoom: 10,
+      maxBounds: [ [-123.5, 49.1], [-122.9, 49.4] ]
+    });
+    map.addControl(new maplibregl.NavigationControl());
+
+    //makes constant polgyonLayer for later popup check on click
+    const polygonLayer = 'polygonsv2';
+    
+    //Filter points based on dropdown menu selection
+    //Dervied from Filtering Excercises from course - changed for the dropdown menu instead
+    //Retrives the chosen filter from the dropdown
+    const pointFilter = document.getElementById('Point-filter');
+
+    function filterCoolingFacilities(){
+      const filterChoice = pointFilter.value;
+
+      //resets opacities if 'Show All' Points is selected
+      if(filterChoice === 'All'){
+        map.setFilter('cooling_facilities', null);
+        map.setFilter('swimming_pools', null);
+
+        map.setPaintProperty('cooling_facilities', 'circle-opacity', 1.0);
+        map.setPaintProperty('cooling_facilities', 'circle-stroke-opacity', 1.0);
+        map.setPaintProperty('swimming_pools', 'circle-opacity', 1.0);
+        map.setPaintProperty('swimming_pools', 'circle-stroke-opacity', 1.0);
+        
+        return;
+      }
+      //If Filter is on Swimming Pools, only show Swimming Pools
+      if(filterChoice === 'Swimming Pools'){
+        map.setFilter('cooling_facilities', null);
+        map.setFilter('swimming_pools', null);
+        map.setPaintProperty('cooling_facilities', 'circle-opacity', 0.1);
+        map.setPaintProperty('cooling_facilities', 'circle-stroke-opacity', 0.1);
+        return;
+      }
+     // Else check the filter choice, and change filter accordingly 
+     const match = ['==', ['get', 'Cooling Facility Type'], filterChoice];
+
+      map.setPaintProperty('cooling_facilities', 'circle-opacity', ['case', match, 1.0, 0.1]);
+      map.setPaintProperty('cooling_facilities', 'circle-stroke-opacity', ['case', match, 1.0, 0.1]);
+      map.setPaintProperty('swimming_pools', 'circle-opacity', 0.1);
+      map.setPaintProperty('swimming_pools', 'circle-stroke-opacity', 0.1);
+    }
+
+    // https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/change_event
+    // event listener for filtering points
+    pointFilter.addEventListener('change', filterCoolingFacilities);
+    
+    //derived from 472 Tissot Matrix slides
+    function onRadiusChange(e) {
+      const radius = Number(e.target.value);
+      document.getElementById("radius").textContent = radius;
+    }
+    const radiusInput = document.getElementById("buffer-radius");
+    radiusInput.addEventListener('input', onRadiusChange); 
+
+    // From 472 Slides - MapLibre-Turf7-user sets distance (to utilise and create buffers)
+    map.on('load', async function () {
+      
+      map.on('mouseenter', polygonLayer, () => {
+        map.getCanvas().style.cursor = 'pointer';
+      });
+      map.on('mouseleave', polygonLayer, () => {
+        map.getCanvas().style.cursor = '';
+      });
+
+      const coolingResponse = await fetch('Vancouver_Cooling_Facilities.geojson');
+      const coolingPoints = await coolingResponse.json();
+
+      const poolResponse = await fetch('SwimmingPools.geojson');
+      const poolPoints = await poolResponse.json();
+
+      // https://turfjs.org/docs/api/featureCollection - to store all these features into one array
+      // So there is no inital buffer on the screen
+      const emptyCollection = { type: 'FeatureCollection', 
+                               features: [] };
+
+      map.addSource('point', {
+        type: 'geojson',
+        data: emptyCollection
+    });
+      
+      map.addLayer({
+        id: 'point-circle',
+        type:'circle',
+        source: 'point',
+        paint: { 'circle-radius': 8,
+                 'circle-color': '#2166ac' 
+        }
+    });
+
+    map.addSource('buffered', {
+      type: 'geojson',
+      data: emptyCollection
+    });
+
+    
+    map.addLayer({
+      id: 'buffered-fill',
+      type: 'fill',
+      source: 'buffered',
+      paint: { 'fill-color': '#2166ac',
+               'fill-opacity': 0.2
+             }
+    });
+
+    map.addLayer({
+      id: 'buffered-line',
+      type: 'line',
+      source: 'buffered',
+      paint: {
+        'line-color': '#1d4ed8',
+        'line-width': 2
+      }
+    });
+    // https://stackoverflow.com/questions/75105896/how-to-solve-the-conflicts-between-the-maps-click-event-and-clicking-the-markers
+    // https://css-tricks.com/practical-use-cases-for-javascripts-closest-method/
+    // Makes sure nothing happens when user clicks on Legends/Popups
+    map.on('click', function (e){
+      if (e.originalEvent.target.closest('.interactables') || e.originalEvent.target.closest('.mapboxgl-popup') || e.originalEvent.target.closest('.Legend')) {
+        return;
+    }  
+    //Popup derived from UBC Filtering Assignment example code and this site (translated to english) for popups
+    //https://geoinnova.org/blog-territorio/maplibre-gl-js-como-anadir-funcionalidades-basicas-e-interactuar-con-datos/
+    // Check if user clicked a polygon to display the stats popup
+    // https://docs.mapbox.com/mapbox-gl-js/example/queryrenderedfeatures/
+    const clickedFeatures = map.queryRenderedFeatures(e.point, { layers: [polygonLayer] });
+    if (clickedFeatures.length > 0) {
+      const polygonInfo = clickedFeatures[0].properties;
+      new maplibregl.Popup()
+        .setLngLat(e.lngLat) // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date/toLocaleString
+        .setHTML(` 
+          <strong>Dissemination Area Statistics</strong><br/>
+          Tree Canopy Cover: ${polygonInfo.tree_canopy_cover_per}%<br/>
+          Average Income: $${Number(polygonInfo.Avg_Income).toLocaleString()}<br/>
+          Total Population: ${Number(polygonInfo.Total_Pop).toLocaleString()}<br/>
+          Dependent Pop Count: ${Number(polygonInfo.dep_pop_count).toLocaleString()}
+        `)
+        .addTo(map);
+    }
+    
+    const bufferRadius = Number(radiusInput.value);
+    // If buffer radius input is 0 (slider), then reset all buffer values to empty
+    if (bufferRadius ===0) {
+        map.getSource('point').setData(emptyCollection);
+        map.getSource('buffered').setData(emptyCollection);
+        document.getElementById('pool-count').textContent = 'Swimming Pools in buffer: 0';
+        document.getElementById('cooling-count').textContent = 'Cooling Facilities in buffer: 0';
+        return;
+    }
+      
+    const clicked = turf.point([e.lngLat.lng, e.lngLat.lat]);
+    const clickedBuffer = turf.buffer(clicked, bufferRadius, { units: 'meters' });
+
+    map.getSource('point').setData(clicked);
+    map.getSource('buffered').setData(clickedBuffer);
+
+    //Point counting for update
+    const poolsWithin = poolPoints ? turf.pointsWithinPolygon(poolPoints, clickedBuffer) : { features: [] };
+    const coolingWithin = coolingPoints ? turf.pointsWithinPolygon(coolingPoints, clickedBuffer) : { features: [] };
+
+   document.getElementById('pool-count').textContent = 'Swimming Pools in buffer: ' + poolsWithin.features.length;
+   document.getElementById('cooling-count').textContent = 'Cooling Facilities in buffer: ' + coolingWithin.features.length;
+    });
+  });
+
+  </script>
+</body>
+</html>
